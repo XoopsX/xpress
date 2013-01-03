@@ -1,53 +1,68 @@
 <?php
 /*
 Plugin Name: WP Multibyte Patch
+Description: Multibyte functionality enhancement for the WordPress Japanese package.
+Version: 1.6.3
 Plugin URI: http://eastcoder.com/code/wp-multibyte-patch/
-Description: Enhances multibyte string I/O functionality of WordPress.
-Author: Kuraishi (tenpura)
-Version: 1.5
-Author URI: http://eastcoder.com/
+Author: Seisuke Kuraishi
+Author URI: http://tinybit.co.jp/
+License: GPLv2
 Text Domain: wp-multibyte-patch
 Domain Path: /languages
 */
 
-/*
-    Copyright (C) 2011 Kuraishi (Email: 210pura at gmail dot com), Tinybit Inc.
-           This program is licensed under the GNU GPL Version 2.
-*/
+/**
+ * Multibyte functionality enhancement for the WordPress Japanese package.
+ *
+ * @package WP_Multibyte_Patch
+ * @version 1.6.3
+ * @author Seisuke Kuraishi <210pura@gmail.com>
+ * @copyright Copyright (c) 2012 Seisuke Kuraishi, Tinybit Inc.
+ * @license http://opensource.org/licenses/gpl-2.0.php GPLv2
+ * @link http://eastcoder.com/code/wp-multibyte-patch/
+ */
 
+/**
+ * @package WP_Multibyte_Patch
+ */
 class multibyte_patch {
 
 	// Do not edit this section. Use wpmp-config.php instead.
-
 	var $conf = array(
-		'excerpt_length' => 55,
 		'excerpt_mblength' => 110,
 		'excerpt_more' => ' [...]',
-		'comment_excerpt_length' => 20,
 		'comment_excerpt_mblength' => 40,
-		'ascii_threshold' => 90,
-		'patch_wp_mail' => true,
-		'patch_incoming_trackback' => true,
-		'patch_incoming_pingback' => true,
+		'dashboard_recent_drafts_mblength' => 40,
+		'patch_wp_mail' => false,
+		'patch_incoming_trackback' => false,
+		'patch_incoming_pingback' => false,
 		'patch_wp_trim_excerpt' => true,
+		'patch_wp_trim_words' => false,
 		'patch_get_comment_excerpt' => true,
-		'patch_process_search_terms' => true,
-		'patch_admin_custom_css' => true,
+		'patch_dashboard_recent_drafts' => true,
+		'patch_process_search_terms' => false,
+		'patch_admin_custom_css' => false,
 		'patch_wplink_js' => true,
 		'patch_word_count_js' => true,
+		'patch_force_character_count' => false,
+		'patch_force_twentytwelve_open_sans_off' => false,
 		'patch_sanitize_file_name' => true,
 		'patch_bp_create_excerpt' => false,
 		'bp_excerpt_mblength' => 110,
 		'bp_excerpt_more' => ' [...]'
 	);
 
-	var $blog_encoding;
-	var $has_mbfunctions;
+	var $blog_encoding = 'UTF-8';
+	var $has_mbfunctions = false;
+	var $mbfunctions_required = false;
+	var $has_mb_strlen = false;
+	var $debug_suffix = '';
 	var $textdomain = 'wp-multibyte-patch';
 	var $lang_dir = 'languages';
-	var $required_version = '3.2';
+	var $required_version = '3.4-RC2';
 	var $query_based_vars = array();
 
+	// For fallback purpose only. (1.6)
 	function guess_encoding($string, $encoding = '') {
 		$blog_encoding = $this->blog_encoding;
 
@@ -59,6 +74,7 @@ class multibyte_patch {
 			return $encoding;
 	}
 
+	// For fallback purpose only. (1.6)
 	function convenc($string, $to_encoding, $from_encoding = '') {
 		$blog_encoding = $this->blog_encoding;
 
@@ -195,69 +211,20 @@ class multibyte_patch {
 			return $commentdata;
 	}
 
-	function is_almost_ascii($string, $encoding) {
-		if(100 === $this->conf['ascii_threshold'])
-			return false;
-
-		return ($this->conf['ascii_threshold'] < round(@(mb_strlen($string, $encoding) / strlen($string)) * 100)) ? true : false;
-	}
-
-	function wp_trim_excerpt($text) {
-		$raw_excerpt = $text;
-
-		$blog_encoding = $this->blog_encoding;
-
-		if('' == $text) {
-			$text = get_the_content('');
-
-			$text = strip_shortcodes( $text );
-
-			$text = apply_filters('the_content', $text);
-			$text = str_replace(']]>', ']]&gt;', $text);
-			$text = strip_tags($text);
-			$excerpt_length = apply_filters('excerpt_length', $this->conf['excerpt_length']);
-			$excerpt_mblength = apply_filters('excerpt_mblength', $this->conf['excerpt_mblength']);
-			$excerpt_more = apply_filters('excerpt_more', $this->conf['excerpt_more']);
-
-			if($this->is_almost_ascii($text, $blog_encoding)) {
-				$words = preg_split("/[\n\r\t ]+/", $text, $excerpt_length + 1, PREG_SPLIT_NO_EMPTY);
-
-				if ( count($words) > $excerpt_length ) {
-					array_pop($words);
-					$text = implode(' ', $words);
-					$text = $text . $excerpt_more;
-				} else {
-					$text = implode(' ', $words);
-				}
-			}
-			else {
-				$text = trim(preg_replace("/[\n\r\t ]+/", ' ', $text), ' ');
-
-				if(mb_strlen($text, $blog_encoding) > $excerpt_mblength)
-					$text = mb_substr($text, 0, $excerpt_mblength, $blog_encoding) . $excerpt_more;
-			}
-		}
-
-		return apply_filters('wp_trim_excerpt', $text, $raw_excerpt);
-	}
-
 	function trim_multibyte_excerpt($text = '', $length = 110, $more = ' [...]', $encoding = 'UTF-8') {
 		$text = strip_shortcodes($text);
 		$text = str_replace(']]>', ']]&gt;', $text);
 		$text = strip_tags($text);
 		$text = trim(preg_replace("/[\n\r\t ]+/", ' ', $text), ' ');
 
-		if(mb_strlen($text, $encoding) > $length)
+		if($this->mb_strlen($text, $encoding) > $length)
 			$text = mb_substr($text, 0, $length, $encoding) . $more;
 
 		return $text;
 	}
 
 	function bp_create_excerpt($text = '') {
-		if($this->is_almost_ascii($text, $this->blog_encoding))
-			return $text;
-		else
-			return $this->trim_multibyte_excerpt($text, $this->conf['bp_excerpt_mblength'], $this->conf['bp_excerpt_more'], $this->blog_encoding);
+		return $this->trim_multibyte_excerpt($text, $this->conf['bp_excerpt_mblength'], $this->conf['bp_excerpt_more'], $this->blog_encoding);
 	}
 
 	function bp_get_activity_content_body($content = '') {
@@ -269,19 +236,26 @@ class multibyte_patch {
 		$excerpt = preg_replace("/\.\.\.$/", '', $excerpt);
 		$blog_encoding = $this->blog_encoding;
 
-		if($this->is_almost_ascii($excerpt, $blog_encoding)) {
-			$words = explode(' ', $excerpt, $this->conf['comment_excerpt_length'] + 1);
-
-			if(count($words) > $this->conf['comment_excerpt_length']) {
-				array_pop($words);
-				$excerpt = implode(' ', $words) . '...';
-			}
-		}
-		elseif(mb_strlen($excerpt, $blog_encoding) > $this->conf['comment_excerpt_mblength']) {
+		if($this->mb_strlen($excerpt, $blog_encoding) > $this->conf['comment_excerpt_mblength'])
 			$excerpt = mb_substr($excerpt, 0, $this->conf['comment_excerpt_mblength'], $blog_encoding) . '...';
-		}
 
 		return $excerpt;
+	}
+
+	function excerpt_mblength() {
+		if(isset($this->query_based_vars['excerpt_mblength']) && (int) $this->query_based_vars['excerpt_mblength'])
+			$length = (int) $this->query_based_vars['excerpt_mblength'];
+		else
+			$length = (int) $this->conf['excerpt_mblength'];
+
+		return apply_filters('excerpt_mblength', $length);
+	}
+
+	function excerpt_more() {
+		if(isset($this->query_based_vars['excerpt_more']))
+			return $this->query_based_vars['excerpt_more'];
+		else
+			return $this->conf['excerpt_more'];
 	}
 
 	function sanitize_file_name($name) {
@@ -293,18 +267,61 @@ class multibyte_patch {
 		return $name;
 	}
 
-	function excerpt_mblength($length) {
-		if(isset($this->query_based_vars['excerpt_mblength']) && (int) $this->query_based_vars['excerpt_mblength'])
-			return $this->query_based_vars['excerpt_mblength'];
-		else
-			return (int) $length;
+	function wplink_js(&$scripts) {
+		$scripts->add('wplink', plugin_dir_url(__FILE__) . "js/wplink{$this->debug_suffix}.js", array('jquery', 'wpdialogs'), false, 1 );
 	}
 
-	function excerpt_more($more) {
-		if(isset($this->query_based_vars['excerpt_more']))
-			return $this->query_based_vars['excerpt_more'];
-		else
-			return $more;
+	function word_count_js(&$scripts) {
+		$scripts->add('word-count', plugin_dir_url(__FILE__) . "js/word-count{$this->debug_suffix}.js", array('jquery'),  false, 1);
+	}
+
+	function force_character_count($translations = '', $text = '', $context = '') {
+		if('word count: words or characters?' == $context && 'words' == $text)
+			return 'characters';
+		return $translations;
+	}
+
+	function force_twentytwelve_open_sans_off() {
+		wp_dequeue_style('twentytwelve-fonts');
+	}
+
+	function wp_dashboard_recent_drafts( $drafts = false ) {
+		if ( !$drafts ) {
+			$drafts_query = new WP_Query( array(
+				'post_type' => 'post',
+				'post_status' => 'draft',
+				'author' => $GLOBALS['current_user']->ID,
+				'posts_per_page' => 5,
+				'orderby' => 'modified',
+				'order' => 'DESC'
+			) );
+			$drafts =& $drafts_query->posts;
+		}
+
+		if ( $drafts && is_array( $drafts ) ) {
+			$list = array();
+			foreach ( $drafts as $draft ) {
+				$url = get_edit_post_link( $draft->ID );
+				$title = _draft_or_post_title( $draft->ID );
+				$item = "<h4><a href='$url' title='" . sprintf( __( 'Edit &#8220;%s&#8221;' ), esc_attr( $title ) ) . "'>" . esc_html($title) . "</a> <abbr title='" . get_the_time(__('Y/m/d g:i:s A'), $draft) . "'>" . get_the_time( get_option( 'date_format' ), $draft ) . '</abbr></h4>';
+				$item .= '<p>' . $this->trim_multibyte_excerpt($draft->post_content, $this->conf['dashboard_recent_drafts_mblength'], $more = '&hellip;', $this->blog_encoding) . '</p>';
+				$list[] = $item;
+			}
+	?>
+		<ul>
+			<li><?php echo join( "</li>\n<li>", $list ); ?></li>
+		</ul>
+		<p class="textright"><a href="edit.php?post_status=draft" ><?php _e('View all'); ?></a></p>
+	<?php
+		} else {
+			_e('There are no drafts at the moment');
+		}
+	}
+
+	function dashboard_recent_drafts() {
+		global $wp_meta_boxes;
+		if(!empty($wp_meta_boxes['dashboard']['side']['core']['dashboard_recent_drafts']['callback']))
+			$wp_meta_boxes['dashboard']['side']['core']['dashboard_recent_drafts']['callback'] = array($this, 'wp_dashboard_recent_drafts');
 	}
 
 	function query_based_settings() {
@@ -319,57 +336,73 @@ class multibyte_patch {
 		}
 	}
 
-	function import_l10n_entry($text, $from_domain, $to_domain = 'default') {
-		global $l10n;
+	// The fallback only works with UTF-8 blog.
+	function mb_strlen($str = '', $encoding = 'UTF-8') {
+		if($this->has_mb_strlen)
+			return mb_strlen($str, $encoding);
+		else
+			return preg_match_all("/./us", $str, $match);
+	}
 
-		if(isset($l10n[$to_domain]->entries) && isset($l10n[$from_domain]->entries[$text]))
-			$l10n[$to_domain]->entries[$text] = $l10n[$from_domain]->entries[$text];
+	function filters_after_setup_theme() {
+		// add filter
+		if(false !== $this->conf['patch_force_character_count'] && 'characters' != _x('words', 'word count: words or characters?'))
+			add_filter('gettext_with_context', array($this, 'force_character_count'), 10, 3);
 	}
 
 	function filters() {
-		// remove filter
-		if(false !== $this->conf['patch_wp_trim_excerpt'])
-			remove_filter('get_the_excerpt', 'wp_trim_excerpt');
-
 		// add filter
-		add_filter('preprocess_comment', array(&$this, 'preprocess_comment'), 99);
-		add_filter('excerpt_mblength', array(&$this, 'excerpt_mblength'), 9);
-		add_filter('excerpt_more', array(&$this, 'excerpt_more'), 9);
+		add_filter('preprocess_comment', array($this, 'preprocess_comment'), 99);
 
 		if(false !== $this->conf['patch_incoming_pingback'])
-			add_filter('pre_remote_source', array(&$this, 'pre_remote_source'), 10, 2);
+			add_filter('pre_remote_source', array($this, 'pre_remote_source'), 10, 2);
 
-		if(false !== $this->conf['patch_wp_trim_excerpt'])
-			add_filter('get_the_excerpt', array(&$this, 'wp_trim_excerpt'));
+		if(false !== $this->conf['patch_wp_trim_excerpt']) {
+			add_filter('excerpt_length', array($this, 'excerpt_mblength'), 99);
+			add_filter('excerpt_more', array($this, 'excerpt_more'), 9);
+		}
 
 		if(false !== $this->conf['patch_get_comment_excerpt'])
-			add_filter('get_comment_excerpt', array(&$this, 'get_comment_excerpt'));
+			add_filter('get_comment_excerpt', array($this, 'get_comment_excerpt'));
 
 		if(false !== $this->conf['patch_sanitize_file_name'])
-			add_filter('sanitize_file_name', array(&$this, 'sanitize_file_name'));
+			add_filter('sanitize_file_name', array($this, 'sanitize_file_name'));
 
 		if(false !== $this->conf['patch_bp_create_excerpt']) {
-			add_filter('bp_create_excerpt', array(&$this, 'bp_create_excerpt'), 99);
-			add_filter('bp_get_activity_content_body', array(&$this, 'bp_get_activity_content_body'), 99);
-			}
+			add_filter('bp_create_excerpt', array($this, 'bp_create_excerpt'), 99);
+			add_filter('bp_get_activity_content_body', array($this, 'bp_get_activity_content_body'), 99);
+		}
+
+		if(method_exists($this, 'wp_trim_words') && false !== $this->conf['patch_wp_trim_words'])
+			add_filter('wp_trim_words', array($this, 'wp_trim_words'), 99, 4);
 
 		// add action
-		add_action('wp', array(&$this, 'query_based_settings'));
+		add_action('wp', array($this, 'query_based_settings'));
 
 		if(method_exists($this, 'process_search_terms') && false !== $this->conf['patch_process_search_terms'])
-			add_action('sanitize_comment_cookies', array(&$this, 'process_search_terms'));
+			add_action('sanitize_comment_cookies', array($this, 'process_search_terms'));
 
 		if(method_exists($this, 'wp_mail') && false !== $this->conf['patch_wp_mail'])
-			add_action('phpmailer_init', array(&$this, 'wp_mail'));
+			add_action('phpmailer_init', array($this, 'wp_mail'));
 
-		if(method_exists($this, 'admin_custom_css') && false !== $this->conf['patch_admin_custom_css'])
-			add_action('admin_head' , array(&$this, 'admin_custom_css'), 99);
+		if(method_exists($this, 'admin_custom_css') && false !== $this->conf['patch_admin_custom_css']) {
+			add_action('admin_enqueue_scripts', array($this, 'admin_custom_css'), 99);
+			add_action('customize_controls_enqueue_scripts', array($this, 'admin_custom_css'), 99);
+		}
 
-		if(method_exists($this, 'wplink_js') && false !== $this->conf['patch_wplink_js'])
-			add_action('wp_default_scripts' , array(&$this, 'wplink_js'), 9);
+		if(false !== $this->conf['patch_wplink_js'])
+			add_action('wp_default_scripts', array($this, 'wplink_js'), 9);
 
-		if(method_exists($this, 'word_count_js') && false !== $this->conf['patch_word_count_js'])
-			add_action('wp_default_scripts' , array(&$this, 'word_count_js'), 9);
+		if(false !== $this->conf['patch_word_count_js'])
+			add_action('wp_default_scripts', array($this, 'word_count_js'), 9);
+
+		if(false !== $this->conf['patch_dashboard_recent_drafts'])
+			add_action('wp_dashboard_setup', array($this, 'dashboard_recent_drafts'));
+
+		if(false !== $this->conf['patch_force_twentytwelve_open_sans_off'] && 'twentytwelve' == get_template())
+			add_action('wp_enqueue_scripts', array($this, 'force_twentytwelve_open_sans_off'), 99);
+
+		add_action('after_setup_theme', array($this, 'filters_after_setup_theme'), 99);
 	}
 
 	function mbfunctions_exist() {
@@ -378,8 +411,7 @@ class multibyte_patch {
 			function_exists('mb_convert_kana') &&
 			function_exists('mb_detect_encoding') &&
 			function_exists('mb_strcut') &&
-			function_exists('mb_strlen') &&
-			function_exists('mb_substr')
+			function_exists('mb_strlen')
 		) ? true : false;
 	}
 
@@ -389,11 +421,11 @@ class multibyte_patch {
 
 		if(version_compare(substr($wp_version, 0, strlen($required_version)), $required_version, '<')) {
 			deactivate_plugins(__FILE__);
-			wp_die(sprintf(__('Sorry, WP Multibyte Patch requires WordPress %s or later.', 'wp-multibyte-patch'), $required_version));
+			exit(sprintf(__('Sorry, WP Multibyte Patch requires WordPress %s or later.', 'wp-multibyte-patch'), $required_version));
 		}
-		elseif(!$this->has_mbfunctions) {
+		elseif(!$this->has_mbfunctions && $this->mbfunctions_required) {
 			deactivate_plugins(__FILE__);
-			wp_die(__('Sorry, WP Multibyte Patch requires mbstring functions.', 'wp-multibyte-patch'));
+			exit(__('Sorry, WP Multibyte Patch requires <a href="http://www.php.net/manual/en/mbstring.installation.php" target="_blank">mbstring</a> functions.', 'wp-multibyte-patch'));
 		}
 	}
 
@@ -414,13 +446,18 @@ class multibyte_patch {
 
 	function __construct() {
 		$this->load_conf();
-
 		$this->blog_encoding = get_option('blog_charset');
+
+		// mbstring functions are required for non UTF-8 blog.
+		if(!preg_match("/^utf-?8$/i", $this->blog_encoding))
+			$this->mbfunctions_required = true;
+
 		$this->has_mbfunctions = $this->mbfunctions_exist();
+		$this->has_mb_strlen = function_exists('mb_strlen');
+		$this->debug_suffix = defined('SCRIPT_DEBUG') && SCRIPT_DEBUG ? '.dev' : '';
 
 		load_textdomain($this->textdomain, plugin_dir_path(__FILE__) . $this->lang_dir . '/' . $this->textdomain . '-' . get_locale() . '.mo');
-		register_activation_hook(__FILE__, array(&$this, 'activation_check'));
-
+		register_activation_hook(__FILE__, array($this, 'activation_check'));
 		$this->filters();
 	}
 }

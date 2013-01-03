@@ -435,15 +435,13 @@ function _delete_block( &$obj )
 //--------------------------------------------------------
 function _create_token()
 {
-	$token_handler =& xoops_gethandler('SingleToken');
-	$obj =& $token_handler->quickCreate( $this->_TOKEN_NAME );
+	$obj =& XoopsSingleTokenHandler::quickCreate($this->_TOKEN_NAME);
 	return $obj->getHtml();
 }
 
 function _validate_token()
 {
-	$token_handler =& xoops_gethandler('SingleToken');
-	return $token_handler->quickValidate( $this->_TOKEN_NAME );
+	return XoopsSingleTokenHandler::quickValidate( $this->_TOKEN_NAME );
 }
 
 //--------------------------------------------------------

@@ -121,7 +121,7 @@ function xpress_oninstall_base( $module , $mydirname )
   		groupid smallint(5) unsigned NOT NULL default '0',
   		blog_id bigint(20) unsigned NOT NULL default '0',
   		name varchar(50)  NOT NULL default '' ,
-  		description text  NOT NULL default '',
+  		description text ,
   		group_type varchar(50)  NOT NULL default '' ,
 		role varchar(20)  NOT NULL default '' ,
 		login_all smallint(5) unsigned NOT NULL default '0' ,
@@ -134,11 +134,11 @@ function xpress_oninstall_base( $module , $mydirname )
 	$queries ="CREATE TABLE $notify_reserve (
   		notify_reserve_id bigint(20) NOT NULL AUTO_INCREMENT ,
   		notify_reserve_status varchar(20)  NOT NULL default '' ,
-  		category text  NOT NULL default '',
+  		category text ,
   		item_id bigint(20) unsigned NOT NULL default '0',
 		event varchar(20) NOT NULL default '',
-		extra_tags_arry longtext NOT NULL default '' ,
-		user_list_arry longtext NOT NULL default '' ,
+		extra_tags_arry longtext NOT NULL ,
+		user_list_arry longtext NOT NULL ,
   		module_id smallint(5) unsigned NOT NULL default '0' ,
   		omit_user_id varchar(20) NOT NULL default '' ,
   		KEY notify_reserve_id (notify_reserve_id)

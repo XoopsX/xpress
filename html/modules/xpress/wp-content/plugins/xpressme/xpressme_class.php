@@ -275,6 +275,7 @@ class XPressME_Class{
 			}
 			if(!$found){
 				$role = '';
+				$login_all = 0;
 				if ($group_type == 'module_admin') $role = 'administrator';
 
 				$edit_sql  = "INSERT INTO  $group_role_table ";

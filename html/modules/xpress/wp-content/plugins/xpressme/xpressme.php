@@ -21,7 +21,10 @@ $xpress_config = new XPressME_Class();
 require_once dirname( __FILE__ ).'/include/pluggable-override.php' ;
 require_once dirname( __FILE__ ).'/include/functions_for_wp_old.php' ;
 
-if (!is_wordpress_style() && ( !empty($xpress_config->theme_select) || $xpress_config->theme_select != 'use_wordpress_select') ){
+if (!is_wordpress_style() 
+	&& ( !empty($xpress_config->theme_select) || $xpress_config->theme_select != 'use_wordpress_select')
+	&& !is_buddypress_active() 
+){
 	add_filter('stylesheet', 'xpress_Stylesheet');
 	add_filter('template', 'xpress_ThemeTemplate');
 }

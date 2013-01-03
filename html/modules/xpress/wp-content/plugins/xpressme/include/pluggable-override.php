@@ -53,10 +53,11 @@ function get_currentuserinfo() {
 			}				
 			return xpress_login();	
 		} else {							// For the xoops guest
-			if ( ! empty($current_user) ){	// When a current user of wordpress is set, a current user is cleared. 
-				wp_set_current_user(0);
-				wp_logout();
-				wp_clear_auth_cookie();
+			wp_set_current_user(0);
+			if ( !preg_match("/MSIE/", $_SERVER['HTTP_USER_AGENT']) && 
+				!preg_match("/msie/", $_SERVER['HTTP_USER_AGENT'])) 
+			{
+				wp_logout();	// When IE is used, it becomes page error by the guest if the wp_logout() is executed here. 
 			}
 			return false;
 		}
@@ -316,9 +317,24 @@ function wp_clear_auth_cookie() {
 }
 endif;
 
-
-
-
+if ( !function_exists('is_user_logged_in') ) :
+/**
+ * Checks if the current visitor is a logged in user.
+ *
+ * @since 2.0.0
+ *
+ * @return bool True if user is logged in, false if not logged in.
+ */
+function is_user_logged_in() {
+	$user = wp_get_current_user();
+	if (method_exists($user, 'exists')) {
+		if ( ! $user->exists() ) return false;
+	} else {
+		if ( empty( $user->ID ) ) return false;
+	}
+	return true;
+}
+endif;
 
 
 // ***********************************  End Of Pluggable Function Edit (wp-include/pluggable.php) ************************************

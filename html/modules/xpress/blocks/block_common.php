@@ -291,4 +291,11 @@ function javascript_check()
 }
 endif;
 
+if (!function_exists('wp_version_compare')){
+	function wp_version_compare($wp_version , $operator='==',$comp_version){
+		$inc_wp_version = str_replace("ME", "", $wp_version);
+	 	return version_compare($inc_wp_version, $comp_version, $operator);
+	}
+}
+
 ?>

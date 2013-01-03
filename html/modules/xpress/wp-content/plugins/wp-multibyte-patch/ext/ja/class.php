@@ -1,19 +1,20 @@
 <?php
-/* WP Multibyte Patch Extension File */
+/**
+ * WP Multibyte Patch Japanese Locale Extension
+ *
+ * @package WP_Multibyte_Patch
+ * @version 1.6.3
+ * @author Seisuke Kuraishi <210pura@gmail.com>
+ * @copyright Copyright (c) 2012 Seisuke Kuraishi, Tinybit Inc.
+ * @license http://opensource.org/licenses/gpl-2.0.php GPLv2
+ * @link http://eastcoder.com/code/wp-multibyte-patch/
+ */
 
-/*
-WPLANG: ja
-Plugin Version: 1.5
-Description: Japanese Locale Extension.
-Author: Kuraishi (tenpura)
-Extension URI: http://eastcoder.com/code/wp-multibyte-patch/
-*/
-
-/*
-    Copyright (C) 2011 Kuraishi (Email: 210pura at gmail dot com), Tinybit Inc.
-           This program is licensed under the GNU GPL Version 2.
-*/
-
+/**
+ * This class extends multibyte_patch.
+ *
+ * @package WP_Multibyte_Patch
+ */
 if(class_exists('multibyte_patch')) :
 class multibyte_patch_ext extends multibyte_patch {
 
@@ -71,7 +72,7 @@ class multibyte_patch_ext extends multibyte_patch {
 			$mode = ($test_str_after != $test_str_before) ? 'UTF-8' : 'JIS';
 		}
 
-		$phpmailer_props = $this->get_phpmailer_properties(&$phpmailer);
+		$phpmailer_props = $this->get_phpmailer_properties($phpmailer);
 		$recipient_methods = array('to' => array('add' => 'AddAddress', 'clear' => 'ClearAddresses'), 'cc' => array('add' => 'AddCC', 'clear' => 'ClearCCs'), 'bcc' => array('add' => 'AddBCC', 'clear' => 'ClearBCCs'));
 
 		if('UTF-8' == $mode) {
@@ -141,24 +142,45 @@ class multibyte_patch_ext extends multibyte_patch {
 	}
 
 	function admin_custom_css() {
-	    echo "\n" . '<link rel="stylesheet" type="text/css" href="' . plugin_dir_url(__FILE__) . 'admin.css' . '" />' . "\n";
+		if(empty($this->conf['admin_custom_css_url']))
+			$url = plugin_dir_url(__FILE__) . 'admin.css';
+		else
+			$url = $this->conf['admin_custom_css_url'];
+
+		wp_register_style('wpmp-admin-custom', $url, array(), false);
+		wp_enqueue_style('wpmp-admin-custom');
 	}
 
-	function wplink_js(&$scripts) {
-		$scripts->add('wplink', plugin_dir_url(__FILE__) . "wplink{$this->debug_suffix}.js", array('jquery', 'wpdialogs'), '20110528');
-	}
+	function wp_trim_words($text = '', $num_words = 110, $more = '', $original_text = '') {
+		if('characters' != _x('words', 'word count: words or characters?'))
+			return $text;
 
-	function word_count_js(&$scripts) {
-		$scripts->add('word-count', plugin_dir_url(__FILE__) . "word-count{$this->debug_suffix}.js", array('jquery'), '20110515');
-		$this->import_l10n_entry('Word count: %s', 'wp-multibyte-patch');
+		$text = $original_text;
+		$text = wp_strip_all_tags($text);
+		$text = trim(preg_replace("/[\n\r\t ]+/", ' ', $text), ' ');
+
+		if(mb_strlen($text, $this->blog_encoding) > $num_words)
+			$text = mb_substr($text, 0, $num_words, $this->blog_encoding) . $more;
+
+		return $text;
 	}
 
 	function __construct() {
+		// mbstring functions are always required for ja.
+		$this->mbfunctions_required = true;
+
+		$this->conf['patch_wp_mail'] = true;
+		$this->conf['patch_incoming_trackback'] = true;
+		$this->conf['patch_incoming_pingback'] = true;
+		$this->conf['patch_process_search_terms'] = true;
+		$this->conf['patch_admin_custom_css'] = true;
+		$this->conf['patch_force_character_count'] = true;
+		$this->conf['patch_force_twentytwelve_open_sans_off'] = true;
+		$this->conf['patch_wp_trim_words'] = true;
 		// auto, JIS, UTF-8
 		$this->conf['mail_mode'] = 'JIS';
-		// Treats any post as a multibyte text.
-		$this->conf['ascii_threshold'] = 100;
-		$this->debug_suffix = defined('SCRIPT_DEBUG') && SCRIPT_DEBUG ? '.dev' : '';
+		$this->conf['admin_custom_css_url'] = '';
+
 		parent::__construct();
 	}
 }

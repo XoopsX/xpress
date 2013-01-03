@@ -434,4 +434,14 @@ function icon_exists($str = '')
 	}
 	return file_exists($str);
 }
+
+function is_buddypress_active(){
+	$active_plugins = get_option('active_plugins');
+	foreach($active_plugins as $active_plugin_path){
+		if (strpos($active_plugin_path,'buddypress')!==false) return true;
+		if (strpos($active_plugin_path,'bp-loader.php')!==false) return true;
+	}
+	return false;
+}
+
 ?>
